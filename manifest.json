@@ -2,25 +2,44 @@
   "name": "Video Merger",
   "short_name": "Video Merger",
   "description": "Merge multiple videos into one — right in your browser. No server, no uploads.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "https://monsihaidi.github.io/video-merger/",
+  "scope": "https://monsihaidi.github.io/video-merger/",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui", "browser"],
   "orientation": "any",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
   "categories": ["productivity", "utilities", "video"],
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "https://monsihaidi.github.io/video-merger/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "https://monsihaidi.github.io/video-merger/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://monsihaidi.github.io/video-merger/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://monsihaidi.github.io/video-merger/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://monsihaidi.github.io/video-merger/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

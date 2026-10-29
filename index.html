@@ -5,14 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Video Merger — Combine your videos in your browser</title>
   <meta name="description" content="Merge multiple videos into one. All processing happens in your browser — videos never leave your device.">
-  <meta name="theme-color" content="#0a0a0a">
-  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- PWA: iOS Safari (most important for iPad/iPhone) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Video Merger">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <!-- iOS: apple-touch-icon MUST be absolute URL for GitHub Pages subdirectory -->
+  <link rel="apple-touch-icon" href="https://monsihaidi.github.io/video-merger/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://monsihaidi.github.io/video-merger/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="https://monsihaidi.github.io/video-merger/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="https://monsihaidi.github.io/video-merger/icon-512.png">
+
+  <!-- PWA manifest: absolute URL for correct scope resolution -->
+  <link rel="manifest" href="https://monsihaidi.github.io/video-merger/manifest.json">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="https://monsihaidi.github.io/video-merger/favicon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://monsihaidi.github.io/video-merger/icon-192.png">
+
   <style>
     /* ===== Reset + base ===== */
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1431,25 +1445,88 @@
           .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
           .catch(err => console.warn('[PWA] Service Worker failed:', err.message));
       });
-
-      // Listen for install prompt
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        // Show a custom install button or banner
-        showInstallBanner(deferredPrompt);
-      });
-
-      window.addEventListener('appinstalled', () => {
-        console.log('[PWA] App installed to home screen');
-        const banner = document.getElementById('installBanner');
-        if (banner) banner.style.display = 'none';
-      });
     }
 
+    // ---- iOS "Add to Home Screen" detection + instructions ----
+    // iOS Safari does NOT fire beforeinstallprompt. Instead, iOS users must
+    // manually use Share → Add to Home Screen. We detect iOS and show
+    // an instruction overlay on first visit (dismissed by the user).
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone === true;
+    const iosDismissedKey = 'vm_ios_homescreen_dismissed';
+
+    if (isIOS && !isStandalone && !localStorage.getItem(iosDismissedKey)) {
+      // Show the iOS install instructions after a short delay
+      setTimeout(() => {
+        const overlay = document.createElement('div');
+        overlay.id = 'iosInstallOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);' +
+          'z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+        overlay.innerHTML = `
+          <div style="background:#1f1f23;border:1px solid #3b82f6;border-radius:16px;padding:28px;max-width:400px;text-align:center;">
+            <div style="font-size:3rem;margin-bottom:12px;">📱</div>
+            <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:12px;">Install Video Merger</h2>
+            <p style="color:#a1a1aa;font-size:0.92rem;line-height:1.6;margin-bottom:20px;">
+              To install this app on your home screen:
+            </p>
+            <div style="text-align:left;background:#0a0a0a;border-radius:8px;padding:16px;margin-bottom:20px;font-size:0.88rem;line-height:1.8;">
+              <div style="margin-bottom:8px;">
+                <span style="color:#3b82f6;font-weight:600;">1.</span>
+                Tap the
+                <span style="display:inline-block;background:#27272a;padding:2px 8px;border-radius:4px;border:1px solid #3f3f46;">
+                  Share
+                </span>
+                button in Safari's toolbar
+              </div>
+              <div style="margin-bottom:8px;">
+                <span style="color:#3b82f6;font-weight:600;">2.</span>
+                Scroll down and tap
+                <span style="display:inline-block;background:#27272a;padding:2px 8px;border-radius:4px;border:1px solid #3f3f46;">
+                  Add to Home Screen
+                </span>
+              </div>
+              <div>
+                <span style="color:#3b82f6;font-weight:600;">3.</span>
+                Tap
+                <span style="display:inline-block;background:#27272a;padding:2px 8px;border-radius:4px;border:1px solid #3f3f46;">
+                  Add
+                </span>
+                — the app icon appears on your home screen
+              </div>
+            </div>
+            <button id="iosDismissBtn" style="background:#3b82f6;color:white;border:none;padding:12px 28px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;">
+              Got it
+            </button>
+          </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        document.getElementById('iosDismissBtn').addEventListener('click', () => {
+          localStorage.setItem(iosDismissedKey, '1');
+          overlay.style.display = 'none';
+        });
+      }, 2000);
+    }
+
+    // ---- Android / Desktop Chrome install banner ----
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      showInstallBanner(deferredPrompt);
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] App installed to home screen');
+      const banner = document.getElementById('installBanner');
+      if (banner) banner.style.display = 'none';
+    });
+
     function showInstallBanner(prompt) {
-      // Only show if not already installed
       if (window.matchMedia('(display-mode: standalone)').matches) return;
 
       const banner = document.createElement('div');

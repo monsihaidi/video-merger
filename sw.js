@@ -1,14 +1,18 @@
 // Service Worker for Video Merger PWA
 // Caches the app shell + FFmpeg.wasm assets for offline use after first load
 
-const CACHE_NAME = 'video-merger-v1';
+const CACHE_NAME = 'video-merger-v2';
+const BASE_URL = 'https://monsihaidi.github.io/video-merger';
+
+// App shell — absolute URLs for correct caching on GitHub Pages subdirectory
 const APP_SHELL = [
-  './',
-  './index.html',
-  './manifest.json',
-  './favicon.svg',
-  './icon-192.png',
-  './icon-512.png',
+  BASE_URL + '/',
+  BASE_URL + '/index.html',
+  BASE_URL + '/manifest.json',
+  BASE_URL + '/favicon.svg',
+  BASE_URL + '/icon-192.png',
+  BASE_URL + '/icon-512.png',
+  BASE_URL + '/apple-touch-icon.png',
 ];
 
 // CDN URLs for FFmpeg.wasm (cached for offline use after first successful load)
