@@ -2,9 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Video Merger — Combine your videos in your browser</title>
   <meta name="description" content="Merge multiple videos into one. All processing happens in your browser — videos never leave your device.">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Video Merger">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <style>
     /* ===== Reset + base ===== */
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1415,6 +1423,63 @@
     }
 
     console.log('Video Merger ready. Select videos to begin.');
+
+    // ---- Register Service Worker for PWA + offline support ----
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+          .catch(err => console.warn('[PWA] Service Worker failed:', err.message));
+      });
+
+      // Listen for install prompt
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Show a custom install button or banner
+        showInstallBanner(deferredPrompt);
+      });
+
+      window.addEventListener('appinstalled', () => {
+        console.log('[PWA] App installed to home screen');
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.style.display = 'none';
+      });
+    }
+
+    function showInstallBanner(prompt) {
+      // Only show if not already installed
+      if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+      const banner = document.createElement('div');
+      banner.id = 'installBanner';
+      banner.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
+        'background:#1f1f23;border:1px solid #3b82f6;color:#fafafa;padding:12px 20px;' +
+        'border-radius:12px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(0,0,0,0.5);' +
+        'z-index:9999;max-width:90vw;font-size:0.9rem;cursor:pointer';
+
+      banner.innerHTML =
+        '<span style="font-size:1.5rem">📱</span>' +
+        '<span><strong>Install Video Merger</strong><br>' +
+        '<span style="color:#71717a;font-size:0.8rem">Add to home screen for offline use</span></span>' +
+        '<button id="installBtn" style="background:#3b82f6;color:white;border:none;padding:8px 16px;' +
+        'border-radius:8px;cursor:pointer;font-weight:600;margin-left:8px">Install</button>';
+
+      document.body.appendChild(banner);
+
+      document.getElementById('installBtn').addEventListener('click', async () => {
+        prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        if (outcome === 'accepted') {
+          console.log('[PWA] User accepted install');
+        } else {
+          console.log('[PWA] User dismissed install');
+        }
+        deferredPrompt = null;
+        banner.style.display = 'none';
+      });
+    }
   </script>
 </body>
 </html>

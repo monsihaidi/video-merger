@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <rect x="48" y="160" width="200" height="192" rx="16" fill="#27272a" stroke="#3b82f6" stroke-width="4"/>
+  <rect x="264" y="160" width="200" height="192" rx="16" fill="#27272a" stroke="#3b82f6" stroke-width="4"/>
+  <path d="M 168 224 L 168 288 L 224 256 Z" fill="#3b82f6"/>
+  <path d="M 384 224 L 384 288 L 440 256 Z" fill="#3b82f6"/>
+  <rect x="224" y="240" width="64" height="32" rx="4" fill="#3b82f6"/>
+  <text x="256" y="410" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#fafafa" text-anchor="middle">MERGER</text>
+</svg>
