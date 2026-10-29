@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.monsihaidi.videomerger",
+    "sha256_cert_fingerprints": [
+      "CC:A9:9A:1C:A5:7C:ED:3A:0E:CB:6D:D3:C7:87:10:26:60:61:4C:0F:5A:A9:82:93:67:82:55:BA:32:4A:0B:48"
+    ]
+  }
+}]
