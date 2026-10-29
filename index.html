@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Merger — Combine your videos in your browser</title>
+  <meta name="description" content="Merge multiple videos into one. All processing happens in your browser — videos never leave your device.">
+  <style>
+    /* ===== Reset + base ===== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #0a0a0a;
+      color: #fafafa;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.5;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    input, select { font-family: inherit; }
+
+    /* ===== Layout ===== */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+    }
+    @media (max-width: 640px) {
+      .container { padding: 16px 12px 60px; }
+    }
+
+    /* ===== Header ===== */
+    header { text-align: center; margin-bottom: 32px; }
+    header h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 6px; }
+    header p { color: #71717a; font-size: 1rem; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-top: 10px;
+    }
+    @media (max-width: 640px) { header h1 { font-size: 1.7rem; } }
+
+    /* ===== Drop zone ===== */
+    .dropzone {
+      border: 2px dashed #3f3f46;
+      border-radius: 14px;
+      padding: 48px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #18181b;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dropzone:hover { border-color: #3b82f6; background: #1f1f23; }
+    .dropzone.dragover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+    .dropzone-icon { font-size: 2.8rem; margin-bottom: 8px; opacity: 0.7; }
+    .dropzone-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+    .dropzone-hint { color: #71717a; font-size: 0.9rem; }
+    .dropzone-formats { color: #52525b; font-size: 0.78rem; margin-top: 8px; }
+
+    /* ===== Video list ===== */
+    .video-list { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .video-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      transition: border-color 0.15s;
+    }
+    .video-row:hover { border-color: #3f3f46; }
+    .video-row.processing { opacity: 0.6; }
+    .video-row.error { border-color: #ef4444; }
+
+    .video-index {
+      min-width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #27272a;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+    .video-thumb {
+      width: 64px;
+      height: 40px;
+      object-fit: cover;
+      background: #0a0a0a;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .video-thumb-placeholder {
+      width: 64px;
+      height: 40px;
+      background: linear-gradient(135deg, #27272a, #3f3f46);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #52525b;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .video-info { flex: 1; min-width: 0; }
+    .video-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .video-meta { color: #71717a; font-size: 0.83rem; }
+    .video-status {
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .status-pending { background: rgba(113, 113, 122, 0.2); color: #a1a1aa; }
+    .status-ready { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .status-error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .status-loading { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+
+    .video-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      color: #a1a1aa;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+    .icon-btn:hover:not(:disabled) {
+      background: #27272a;
+      color: #fafafa;
+      border-color: #3f3f46;
+    }
+    .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .icon-btn.danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border-color: #ef4444;
+    }
+
+    /* ===== Summary + actions ===== */
+    .actions-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding: 16px;
+      background: #18181b;
+      border-radius: 12px;
+    }
+    .actions-bar label { font-size: 0.92rem; color: #a1a1aa; }
+    .actions-bar select {
+      padding: 8px 12px;
+      background: #0a0a0a;
+      color: #fafafa;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      cursor: pointer;
+    }
+    .actions-bar select:focus { outline: none; border-color: #3b82f6; }
+
+    .summary {
+      margin-left: auto;
+      color: #71717a;
+      font-size: 0.88rem;
+    }
+    .summary strong { color: #fafafa; font-weight: 600; }
+
+    .btn-primary {
+      padding: 12px 28px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 8px;
+      font-size: 0.98rem;
+      font-weight: 600;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+    .btn-primary:disabled { background: #27272a; color: #71717a; cursor: not-allowed; }
+
+    .btn-secondary {
+      padding: 10px 18px;
+      background: transparent;
+      color: #a1a1aa;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover { color: #fafafa; border-color: #3f3f46; }
+
+    /* ===== Progress ===== */
+    .progress-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #18181b;
+      border-radius: 12px;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+    .progress-stage { color: #a1a1aa; }
+    .progress-percent { font-weight: 600; }
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background: #27272a;
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+      transition: width 0.3s;
+      width: 0%;
+    }
+    /* Animated stripe when in Finalizing stage (post-FFmpeg, reading output) */
+    .progress-fill.finalizing {
+      background: linear-gradient(45deg,
+        #2563eb 25%, #3b82f6 25%, #3b82f6 50%,
+        #2563eb 50%, #2563eb 75%, #3b82f6 75%, #3b82f6 100%);
+      background-size: 20px 20px;
+      animation: progress-stripes 1s linear infinite;
+    }
+    @keyframes progress-stripes {
+      from { background-position: 0 0; }
+      to { background-position: 20px 0; }
+    }
+    .progress-detail {
+      margin-top: 8px;
+      color: #71717a;
+      font-size: 0.83rem;
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .finalizing-hint {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 6px;
+      color: #60a5fa;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .finalizing-hint.active { display: block; }
+
+    /* ===== Result ===== */
+    .result-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #18181b;
+      border-radius: 12px;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      color: #22c55e;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 540px) { .result-grid { grid-template-columns: 1fr; } }
+    .result-item {
+      padding: 8px 12px;
+      background: #0a0a0a;
+      border-radius: 6px;
+    }
+    .result-label {
+      color: #71717a;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .result-value { font-size: 0.98rem; font-weight: 500; margin-top: 2px; }
+    .result-preview {
+      width: 100%;
+      max-height: 360px;
+      background: #000;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .result-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn-download {
+      padding: 14px 28px;
+      background: #22c55e;
+      color: white;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+      transition: background 0.15s;
+      border: none;
+      cursor: pointer;
+      font-size: 0.98rem;
+    }
+    .btn-download:hover:not(:disabled) { background: #16a34a; }
+    .btn-download:disabled { background: #27272a; color: #71717a; cursor: not-allowed; }
+    .ios-hint {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 6px;
+      color: #60a5fa;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    /* ===== Warning / error banners ===== */
+    .banner {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .banner-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
+    .banner-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; }
+    .banner-info { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; }
+
+    /* ===== Footer ===== */
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #27272a;
+      color: #52525b;
+      font-size: 0.82rem;
+      text-align: center;
+    }
+    footer a { color: #71717a; text-decoration: underline; }
+
+    /* ===== Loading overlay (for ffmpeg.wasm load) ===== */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 10, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .loading-overlay.active { display: flex; }
+    .loading-box {
+      background: #18181b;
+      padding: 32px;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #27272a;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.95rem; margin-bottom: 12px; }
+    .loading-progress {
+      width: 100%;
+      height: 4px;
+      background: #27272a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loading-progress-fill {
+      height: 100%;
+      background: #3b82f6;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .loading-percent { font-size: 0.82rem; color: #71717a; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Video Merger</h1>
+      <p>Combine your videos into one — right in your browser.</p>
+      <span class="badge">🔒 100% private — videos never leave your device</span>
+    </header>
+
+    <main>
+      <!-- Step 1: Select -->
+      <div id="dropzone" class="dropzone">
+        <div class="dropzone-icon">＋</div>
+        <div class="dropzone-title">Add Videos</div>
+        <div class="dropzone-hint">Click or drag-and-drop multiple video files</div>
+        <div class="dropzone-formats">MP4 · MOV · MKV · WebM · AVI · M4V</div>
+        <input id="fileInput" type="file" multiple accept="video/*" style="display:none">
+      </div>
+
+      <!-- Step 2: List -->
+      <div id="videoList" class="video-list"></div>
+
+      <!-- Step 3: Actions -->
+      <div id="actionsBar" class="actions-bar" style="display:none">
+        <label for="preset">Output:</label>
+        <select id="preset">
+          <option value="1080p">1080p H.264 (recommended)</option>
+          <option value="720p">720p H.264</option>
+          <option value="original">Original (concat only — faster, may fail if formats differ)</option>
+        </select>
+        <button id="mergeBtn" class="btn-primary" disabled>Merge Videos</button>
+        <div id="summary" class="summary"></div>
+      </div>
+
+      <!-- Progress -->
+      <div id="progressSection" class="progress-section" style="display:none">
+        <div class="progress-label">
+          <span id="progressStage" class="progress-stage">Preparing…</span>
+          <span id="progressPercent" class="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div id="finalizingHint" class="finalizing-hint">
+          ⏳ Reading the merged video from FFmpeg's memory. This can take 10-30 seconds for large videos — the progress bar is paused at 92% during this step. Please don't close the tab.
+        </div>
+        <div id="progressDetail" class="progress-detail"></div>
+        <button id="cancelBtn" class="btn-secondary" style="margin-top:12px">Cancel</button>
+      </div>
+
+      <!-- Result -->
+      <div id="resultSection" class="result-section" style="display:none">
+        <div class="result-header">✓ Merge Complete</div>
+        <video id="resultPreview" class="result-preview" controls></video>
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-label">Duration</div>
+            <div id="resultDuration" class="result-value">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">Resolution</div>
+            <div id="resultResolution" class="result-value">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">File size</div>
+            <div id="resultSize" class="result-value">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-label">Format</div>
+            <div id="resultFormat" class="result-value">MP4 / H.264 / AAC</div>
+          </div>
+        </div>
+        <div class="result-actions">
+          <button id="downloadBtn" class="btn-download" type="button">↓ Save Video</button>
+          <button id="shareBtn" class="btn-secondary" type="button" style="display:none">Share</button>
+          <button id="resetBtn" class="btn-secondary">Merge Another</button>
+        </div>
+        <div id="iosHint" class="ios-hint" style="display:none">
+          <strong>iOS tip:</strong> If "Save Video" doesn't work, long-press the video preview above and choose "Save Video" or "Save to Files" from the popup menu.
+        </div>
+      </div>
+
+      <!-- Error banner -->
+      <div id="errorBanner" class="banner banner-error" style="display:none"></div>
+    </main>
+
+    <footer>
+      <p>Built with <a href="https://ffmpegwasm.netlify.app/" target="_blank" rel="noopener">FFmpeg.wasm</a> ·
+         No server, no tracking, no uploads ·
+         <a href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noopener">Source</a></p>
+    </footer>
+  </div>
+
+  <!-- Loading overlay for FFmpeg.wasm initialization -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <div id="loadingText" class="loading-text">Loading FFmpeg engine…</div>
+      <div class="loading-progress"><div id="loadingFill" class="loading-progress-fill"></div></div>
+      <div id="loadingPercent" class="loading-percent">0%</div>
+      <div style="margin-top:12px;color:#71717a;font-size:0.8rem">First load downloads ~30 MB (cached afterwards)</div>
+    </div>
+  </div>
+
+  <!-- ===== FFmpeg.wasm (UMD build — works on Safari/iPad/iPhone via classic workers) ===== -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"
+          onerror="window._ffmpegLoadFailed=true"></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"
+          onerror="window._utilLoadFailed=true"></script>
+
+  <!-- Fallback CDN #1: jsdelivr if unpkg fails -->
+  <script>
+    if (window._ffmpegLoadFailed) {
+      console.log('unpkg failed for ffmpeg.js, trying jsdelivr...');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (window._utilLoadFailed) {
+      console.log('unpkg failed for util, trying jsdelivr...');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"><\/script>');
+    }
+  </script>
+
+  <script>
+    // ============================================================
+    //  Video Merger — single-file browser app
+    //  Uses FFmpeg.wasm to run real FFmpeg in the browser.
+    //  No server, no uploads — videos stay on the user's device.
+    // ============================================================
+
+    'use strict';
+
+    // ---- State ----
+    const state = {
+      videos: [],        // [{ id, file, name, size, duration, width, height, codec, thumbnail, status, error }]
+      ffmpeg: null,
+      ffmpegLoaded: false,
+      cancelRequested: false,
+      isProcessing: false,
+    };
+
+    // ---- DOM refs ----
+    const $ = (id) => document.getElementById(id);
+    const dropzone = $('dropzone');
+    const fileInput = $('fileInput');
+    const videoList = $('videoList');
+    const actionsBar = $('actionsBar');
+    const mergeBtn = $('mergeBtn');
+    const preset = $('preset');
+    const summary = $('summary');
+    const progressSection = $('progressSection');
+    const progressStage = $('progressStage');
+    const progressPercent = $('progressPercent');
+    const progressFill = $('progressFill');
+    const progressDetail = $('progressDetail');
+    const finalizingHint = $('finalizingHint');
+    const cancelBtn = $('cancelBtn');
+    const resultSection = $('resultSection');
+    const resultPreview = $('resultPreview');
+    const downloadBtn = $('downloadBtn');
+    const shareBtn = $('shareBtn');
+    const iosHint = $('iosHint');
+    const resetBtn = $('resetBtn');
+    const errorBanner = $('errorBanner');
+    const loadingOverlay = $('loadingOverlay');
+    const loadingText = $('loadingText');
+    const loadingFill = $('loadingFill');
+    const loadingPercent = $('loadingPercent');
+
+    // ---- Helpers ----
+    function formatBytes(b) {
+      if (b === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(b) / Math.log(1024));
+      return (b / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+    function formatDuration(s) {
+      if (!s || s < 0) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ':' + String(sec).padStart(2, '0');
+    }
+    function genId() {
+      return 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+    }
+    function showError(msg) {
+      errorBanner.style.display = 'flex';
+      errorBanner.innerHTML = '<strong>Error:</strong>&nbsp;' + msg;
+      errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function clearError() { errorBanner.style.display = 'none'; errorBanner.innerHTML = ''; }
+
+    // ---- File selection ----
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length) addFiles(files);
+      fileInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(ev => {
+      dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(ev => {
+      dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    });
+    dropzone.addEventListener('drop', (e) => {
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length) addFiles(files);
+    });
+
+    async function addFiles(files) {
+      clearError();
+      const validExts = ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'];
+      const accepted = files.filter(f => {
+        const ext = '.' + (f.name.split('.').pop() || '').toLowerCase();
+        return validExts.includes(ext) || f.type.startsWith('video/');
+      });
+      const rejected = files.filter(f => !accepted.includes(f));
+      if (rejected.length) {
+        showError(rejected.length + ' file(s) skipped (not a recognized video format).');
+      }
+      for (const f of accepted) {
+        const v = {
+          id: genId(),
+          file: f,
+          name: f.name,
+          size: f.size,
+          duration: 0,
+          width: 0,
+          height: 0,
+          codec: '',
+          thumbnail: null,
+          status: 'loading',
+          error: null,
+        };
+        state.videos.push(v);
+        renderList();
+        // Extract metadata async
+        try {
+          const meta = await extractMetadata(f);
+          v.duration = meta.duration;
+          v.width = meta.width;
+          v.height = meta.height;
+          v.thumbnail = meta.thumbnail;
+          v.status = 'ready';
+        } catch (e) {
+          console.error('metadata extract failed', e);
+          v.status = 'error';
+          v.error = 'Could not read video metadata: ' + (e.message || e);
+        }
+        renderList();
+        updateActions();
+      }
+    }
+
+    function extractMetadata(file) {
+      return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        const url = URL.createObjectURL(file);
+        video.src = url;
+
+        const cleanup = () => {
+          URL.revokeObjectURL(url);
+          video.src = '';
+        };
+
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('timeout reading metadata'));
+        }, 15000);
+
+        video.onloadedmetadata = () => {
+          // Wait for a frame to be available for thumbnail
+          video.currentTime = Math.min(0.1, (video.duration || 1) / 2);
+        };
+        video.onseeked = () => {
+          clearTimeout(timeout);
+          let thumbnail = null;
+          try {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(1, 128 / Math.max(video.videoWidth, 1));
+            canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+            canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+          } catch (e) {
+            console.warn('thumbnail failed', e);
+          }
+          const meta = {
+            duration: video.duration || 0,
+            width: video.videoWidth || 0,
+            height: video.videoHeight || 0,
+            thumbnail: thumbnail,
+          };
+          cleanup();
+          resolve(meta);
+        };
+        video.onerror = () => {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error('browser could not decode this file'));
+        };
+      });
+    }
+
+    // ---- Render list ----
+    function renderList() {
+      if (state.videos.length === 0) {
+        videoList.innerHTML = '';
+        actionsBar.style.display = 'none';
+        return;
+      }
+      actionsBar.style.display = 'flex';
+      videoList.innerHTML = state.videos.map((v, i) => {
+        const statusClass = 'status-' + (v.status === 'loading' ? 'loading' : v.status === 'ready' ? 'ready' : v.status === 'error' ? 'error' : 'pending');
+        const statusLabel = v.status === 'loading' ? 'Loading…' :
+                            v.status === 'ready' ? 'Ready' :
+                            v.status === 'error' ? 'Error' : 'Pending';
+        const thumb = v.thumbnail
+          ? '<img class="video-thumb" src="' + v.thumbnail + '" alt="">'
+          : '<div class="video-thumb-placeholder">▶</div>';
+        const meta = v.duration
+          ? formatDuration(v.duration) + ' · ' + v.width + '×' + v.height + ' · ' + formatBytes(v.size)
+          : formatBytes(v.size) + (v.error ? ' · ' + v.error : '');
+        return '' +
+          '<div class="video-row ' + (v.status === 'loading' ? 'processing' : '') + ' ' + (v.status === 'error' ? 'error' : '') + '" data-id="' + v.id + '">' +
+            '<div class="video-index">' + String(i + 1).padStart(2, '0') + '</div>' +
+            thumb +
+            '<div class="video-info">' +
+              '<div class="video-name" title="' + escapeHtml(v.name) + '">' + escapeHtml(v.name) + '</div>' +
+              '<div class="video-meta">' + meta + '</div>' +
+            '</div>' +
+            '<div class="video-status ' + statusClass + '">' + statusLabel + '</div>' +
+            '<div class="video-actions">' +
+              '<button class="icon-btn" data-action="up" data-id="' + v.id + '" ' + (i === 0 ? 'disabled' : '') + '>↑</button>' +
+              '<button class="icon-btn" data-action="down" data-id="' + v.id + '" ' + (i === state.videos.length - 1 ? 'disabled' : '') + '>↓</button>' +
+              '<button class="icon-btn danger" data-action="remove" data-id="' + v.id + '" title="Remove">×</button>' +
+            '</div>' +
+          '</div>';
+      }).join('');
+
+      // Wire up action buttons
+      videoList.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          const idx = state.videos.findIndex(v => v.id === id);
+          if (idx === -1) return;
+          if (action === 'up' && idx > 0) {
+            [state.videos[idx - 1], state.videos[idx]] = [state.videos[idx], state.videos[idx - 1]];
+          } else if (action === 'down' && idx < state.videos.length - 1) {
+            [state.videos[idx + 1], state.videos[idx]] = [state.videos[idx], state.videos[idx + 1]];
+          } else if (action === 'remove') {
+            state.videos.splice(idx, 1);
+          }
+          renderList();
+          updateActions();
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function updateActions() {
+      const readyCount = state.videos.filter(v => v.status === 'ready').length;
+      const totalDuration = state.videos.reduce((a, v) => a + (v.duration || 0), 0);
+      mergeBtn.disabled = readyCount < 2 || state.isProcessing;
+      summary.innerHTML = readyCount + ' of ' + state.videos.length + ' ready · ' +
+                          '<strong>' + state.videos.length + '</strong> videos · ' +
+                          '<strong>' + formatDuration(totalDuration) + '</strong>';
+    }
+
+    // ---- FFmpeg.wasm loader ----
+    // Uses the UMD build with a monkey-patched Worker constructor for Safari/iPad/iPhone compatibility.
+    //
+    // Detects three common failure modes and shows actionable error messages:
+    //   1. file:// protocol — browsers block fetch() from file:// to https:// URLs
+    //   2. CDN unreachable — tries unpkg, then jsdelivr, then statically as fallbacks
+    //   3. Worker construction blocked — handled by the blob URL monkey-patch
+
+    // CDN candidates (tried in order until one works)
+    const CDN_CANDIDATES = [
+      { name: 'unpkg',     base: 'https://unpkg.com',                    path: '' },
+      { name: 'jsdelivr',  base: 'https://cdn.jsdelivr.net/npm',         path: '' },
+      { name: 'statically', base: 'https://cdn.statically.io/gh',        path: '/ffmpegwasm/ffmpeg.wasm/main/packages' },
+      { name: 'esm.sh',    base: 'https://esm.sh',                       path: '' },
+    ];
+
+    let _ffmpegWorkerBlobURL = null;
+    const _OriginalWorker = window.Worker;
+    window.Worker = class PatchedWorker extends _OriginalWorker {
+      constructor(url, options) {
+        const urlStr = (typeof url === 'string') ? url : (url && url.href ? url.href : String(url));
+        if (_ffmpegWorkerBlobURL && urlStr.includes('814.ffmpeg.js')) {
+          console.log('[FFmpeg] Intercepted worker URL, redirecting to blob URL');
+          super(_ffmpegWorkerBlobURL, { type: undefined });
+          return;
+        }
+        super(url, options);
+      }
+    };
+
+    // Check if the page is running from file:// protocol
+    function isFileProtocol() {
+      return window.location.protocol === 'file:';
+    }
+
+    // Try fetching a URL, return the response if OK, else throw
+    async function tryFetch(url, timeoutMs) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs || 10000);
+      try {
+        const resp = await fetch(url, { signal: controller.signal, mode: 'cors' });
+        clearTimeout(timeout);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp;
+      } catch (e) {
+        clearTimeout(timeout);
+        throw e;
+      }
+    }
+
+    // Fetch a URL as a blob URL, trying multiple CDNs
+    async function fetchAsBlobURLWithFallback(relativePath, mimeType, progressCb) {
+      const errors = [];
+      for (const cdn of CDN_CANDIDATES) {
+        let url;
+        if (cdn.name === 'statically') {
+          url = cdn.base + cdn.path + relativePath;
+        } else if (cdn.name === 'esm.sh') {
+          url = cdn.base + relativePath.replace(/^\/@ffmpeg\/ffmpeg/, '@ffmpeg/ffmpeg').replace(/^\/@ffmpeg\/util/, '@ffmpeg/util').replace(/^\/@ffmpeg\/core/, '@ffmpeg/core');
+        } else {
+          url = cdn.base + relativePath;
+        }
+        try {
+          console.log('[FFmpeg] Trying', url);
+          // Use toBlobURL if we need progress reporting, else tryFetch
+          if (progressCb) {
+            const blobURL = await FFmpegUtil.toBlobURL(url, mimeType, true, progressCb);
+            return blobURL;
+          } else {
+            const resp = await tryFetch(url, 15000);
+            const blob = await resp.blob();
+            return URL.createObjectURL(blob);
+          }
+        } catch (e) {
+          console.warn('[FFmpeg] Failed at', cdn.name + ':', e.message);
+          errors.push(cdn.name + ': ' + (e.message || e));
+        }
+      }
+      throw new Error('All CDNs failed: ' + errors.join('; '));
+    }
+
+    async function ensureFFmpeg() {
+      if (state.ffmpegLoaded && state.ffmpeg) return state.ffmpeg;
+
+      // CRITICAL: detect file:// protocol early and show a clear error
+      if (isFileProtocol()) {
+        const fileMsg =
+          'This app needs to be served over HTTP, not opened directly from disk.\n\n' +
+          'You opened the file via file:// protocol, which blocks cross-origin requests.\n\n' +
+          'To fix this, run a simple local web server:\n\n' +
+          'Option A (Python):\n' +
+          '  Open Terminal/Command Prompt in the folder containing video-merger.html\n' +
+          '  Run: python -m http.server 8000\n' +
+          '  Open http://localhost:8000/video-merger.html in your browser\n\n' +
+          'Option B (Node.js):\n' +
+          '  npx http-server\n' +
+          '  Open the URL it prints (usually http://localhost:8080)\n\n' +
+          'Option C (upload to any static web host):\n' +
+          '  GitHub Pages, Netlify, Vercel, Cloudflare Pages all work.\n\n' +
+          'Option D (online demo):\n' +
+          '  Open https://ffmpegwasm.netlify.app/ in your browser.';
+        alert(fileMsg);
+        throw new Error(fileMsg);
+      }
+
+      loadingOverlay.classList.add('active');
+      loadingText.textContent = 'Loading FFmpeg engine…';
+      loadingFill.style.width = '0%';
+      loadingPercent.textContent = '0%';
+
+      try {
+        if (typeof FFmpegWASM === 'undefined' || typeof FFmpegUtil === 'undefined') {
+          throw new Error(
+            'FFmpeg.wasm library failed to load from any CDN. ' +
+            'Check your internet connection, or check if your network/firewall ' +
+            'blocks unpkg.com, cdn.jsdelivr.net, or cdn.statically.io.'
+          );
+        }
+        const FFmpeg = FFmpegWASM.FFmpeg;
+        const toBlobURL = FFmpegUtil.toBlobURL;
+
+        const ffmpeg = new FFmpeg();
+        ffmpeg.on('progress', ({ progress }) => {
+          const pct = Math.max(0, Math.min(100, progress * 100));
+          loadingFill.style.width = pct.toFixed(0) + '%';
+          loadingPercent.textContent = pct.toFixed(0) + '%';
+        });
+        ffmpeg.on('log', ({ message }) => {
+          if (state.isProcessing) {
+            appendProgressDetail(message);
+          }
+        });
+
+        // CDN-relative paths for each asset
+        const workerPath = '/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
+        const corePath = '/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
+        const wasmPath = '/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm';
+
+        // Step 1: Fetch the worker chunk as a blob URL (try multiple CDNs)
+        loadingText.textContent = 'Downloading FFmpeg worker… (trying CDNs)';
+        _ffmpegWorkerBlobURL = await fetchAsBlobURLWithFallback(workerPath, 'text/javascript', null);
+        loadingFill.style.width = '5%';
+        loadingPercent.textContent = '5%';
+
+        // Step 2: Pre-fetch the WASM as a blob URL
+        loadingText.textContent = 'Downloading FFmpeg WASM (~30 MB, cached after first load)…';
+        const wasmBlobURL = await fetchAsBlobURLWithFallback(wasmPath, 'application/wasm', (p) => {
+          loadingFill.style.width = (5 + p * 90).toFixed(0) + '%';
+          loadingPercent.textContent = (5 + p * 90).toFixed(0) + '%';
+        });
+
+        loadingText.textContent = 'Initializing FFmpeg engine…';
+        loadingFill.style.width = '98%';
+        loadingPercent.textContent = '98%';
+
+        // Step 3: Build the core URL — we use the same CDN that worked for the worker
+        // (deduced from the blob URL's origin... but since blob URLs are opaque, we
+        // just try each CDN in order until importScripts succeeds)
+        let loaded = false;
+        let lastCoreError = null;
+        for (const cdn of CDN_CANDIDATES) {
+          let coreURL;
+          if (cdn.name === 'statically') {
+            coreURL = cdn.base + cdn.path + corePath;
+          } else if (cdn.name === 'esm.sh') {
+            coreURL = cdn.base + corePath.replace(/^\/@ffmpeg\/core/, '@ffmpeg/core');
+          } else {
+            coreURL = cdn.base + corePath;
+          }
+          console.log('[FFmpeg] Trying core from', cdn.name, ':', coreURL);
+          try {
+            await ffmpeg.load({
+              coreURL: coreURL,
+              wasmURL: wasmBlobURL,
+            });
+            loaded = true;
+            console.log('[FFmpeg] Loaded successfully from', cdn.name);
+            break;
+          } catch (e) {
+            console.warn('[FFmpeg] Core load failed at', cdn.name + ':', e.message);
+            lastCoreError = e;
+          }
+        }
+
+        if (!loaded) {
+          throw new Error(
+            'Could not load the FFmpeg core from any CDN. Last error: ' +
+            (lastCoreError ? (lastCoreError.message || lastCoreError) : 'unknown') +
+            '. Check your internet connection and try again.'
+          );
+        }
+
+        state.ffmpeg = ffmpeg;
+        state.ffmpegLoaded = true;
+        loadingFill.style.width = '100%';
+        loadingPercent.textContent = '100%';
+        await new Promise(r => setTimeout(r, 300));
+        loadingOverlay.classList.remove('active');
+        return ffmpeg;
+      } catch (e) {
+        loadingOverlay.classList.remove('active');
+        // Provide actionable advice for common failures
+        let helpful = e.message || String(e);
+        if (helpful.includes('Failed to fetch') || helpful.includes('NetworkError')) {
+          helpful += '\n\nThis usually means:\n' +
+            '  • No internet connection, OR\n' +
+            '  • A firewall is blocking unpkg.com / jsdelivr.net / statically.io, OR\n' +
+            '  • You opened this file via file:// (must be served over HTTP)';
+        }
+        throw new Error(helpful);
+      }
+    }
+
+    // ---- Merge logic ----
+    mergeBtn.addEventListener('click', async () => {
+      clearError();
+      const readyVideos = state.videos.filter(v => v.status === 'ready');
+      if (readyVideos.length < 2) {
+        showError('Need at least 2 ready videos to merge.');
+        return;
+      }
+      state.isProcessing = true;
+      state.cancelRequested = false;
+      mergeBtn.disabled = true;
+      progressSection.style.display = 'block';
+      resultSection.style.display = 'none';
+      setProgress(0, 'Preparing', 'Loading FFmpeg engine…');
+      appendProgressDetail('--- Video Merger started ---');
+
+      try {
+        const ffmpeg = await ensureFFmpeg();
+        if (state.cancelRequested) throw new Error('cancelled');
+
+        // 1. Write each video to FFmpeg's virtual filesystem
+        setProgress(5, 'Loading videos', 'Copying ' + readyVideos.length + ' files into FFmpeg memory…');
+        const fetchFile = FFmpegUtil.fetchFile;
+        const inputFiles = [];
+        for (let i = 0; i < readyVideos.length; i++) {
+          if (state.cancelRequested) throw new Error('cancelled');
+          const v = readyVideos[i];
+          const fname = 'input_' + i + '.' + (v.name.split('.').pop() || 'mp4').toLowerCase();
+          setProgress(5 + (i / readyVideos.length) * 15, 'Loading videos',
+                      'Loading ' + (i + 1) + '/' + readyVideos.length + ': ' + v.name);
+          const data = await fetchFile(v.file);
+          await ffmpeg.writeFile(fname, data);
+          inputFiles.push({ fname, video: v });
+          appendProgressDetail('  loaded ' + fname + ' (' + formatBytes(data.byteLength) + ')');
+        }
+
+        // 2. Write concat list
+        setProgress(22, 'Preparing', 'Writing concat list…');
+        let listContent = '';
+        for (const f of inputFiles) {
+          listContent += "file '" + f.fname + "'\n";
+        }
+        await ffmpeg.writeFile('list.txt', new TextEncoder().encode(listContent));
+        appendProgressDetail('  list.txt written with ' + inputFiles.length + ' entries');
+
+        // 3. Build ffmpeg command
+        const targetPreset = preset.value;
+        let cmd;
+        const allSameSize = inputFiles.every(f =>
+          f.video.width === inputFiles[0].video.width &&
+          f.video.height === inputFiles[0].video.height
+        );
+
+        if (targetPreset === 'original' && allSameSize) {
+          // Stream-copy concat (fastest, no re-encode)
+          cmd = ['-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', '-y', 'output.mp4'];
+          appendProgressDetail('  strategy: stream-copy (no re-encode, fastest)');
+        } else {
+          // Re-encode + normalize
+          let targetW, targetH;
+          if (targetPreset === '720p') { targetW = 1280; targetH = 720; }
+          else if (targetPreset === '1080p') { targetW = 1920; targetH = 1080; }
+          else {
+            // 'original' with mismatched sizes → use the first input's resolution
+            targetW = inputFiles[0].video.width || 1280;
+            targetH = inputFiles[0].video.height || 720;
+          }
+          const vf = 'scale=' + targetW + ':' + targetH + ':force_original_aspect_ratio=decrease,' +
+                     'pad=' + targetW + ':' + targetH + ':(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30';
+          cmd = ['-f', 'concat', '-safe', '0', '-i', 'list.txt',
+                 '-vf', vf,
+                 '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p',
+                 '-c:a', 'aac', '-b:a', '128k',
+                 '-movflags', '+faststart',
+                 '-y', 'output.mp4'];
+          appendProgressDetail('  strategy: re-encode to ' + targetW + 'x' + targetH + ' H.264/AAC');
+          appendProgressDetail('  filter: ' + vf);
+        }
+
+        // 4. Run ffmpeg
+        setProgress(25, 'Merging', 'Running FFmpeg…');
+        // Hook up progress callback for the actual transcode
+        ffmpeg.on('progress', ({ progress }) => {
+          if (state.cancelRequested) return;
+          const pct = Math.max(0, Math.min(1, progress));
+          // Map 0..1 to 25..90 of overall progress
+          setProgress(25 + pct * 65, 'Merging',
+                      'Encoding ' + (pct * 100).toFixed(1) + '%');
+        });
+
+        const startTs = performance.now();
+        // Run exec with a hard timeout — if FFmpeg hangs (rare but possible after
+        // the "Aborted()" Emscripten exit), we abort and report a clear error
+        // instead of hanging forever at ~90%.
+        try {
+          await Promise.race([
+            ffmpeg.exec(cmd),
+            new Promise((_, reject) => setTimeout(
+              () => reject(new Error('FFmpeg timed out after 5 minutes')),
+              300000  // 5 minutes
+            )),
+          ]);
+        } catch (execErr) {
+          // If exec itself failed (not from our timeout), the error is meaningful
+          if (String(execErr.message).includes('timed out')) {
+            throw execErr;
+          }
+          // FFmpeg returned non-zero — common for unsupported codecs. Show the error.
+          appendProgressDetail('  [error] ffmpeg.exec threw: ' + (execErr.message || execErr));
+          throw new Error('FFmpeg failed during encoding: ' + (execErr.message || execErr) +
+                          '. Check the progress log above for FFmpeg error messages.');
+        }
+        const elapsed = ((performance.now() - startTs) / 1000).toFixed(1);
+        appendProgressDetail('  ffmpeg completed in ' + elapsed + 's');
+
+        if (state.cancelRequested) throw new Error('cancelled');
+
+        // 5. Read output — FFmpeg.wasm 0.12 prints "Aborted()" after exec() which
+        //    can leave the worker in a half-dead state. The readFile call usually
+        //    still works but can be slow on large outputs. Show a spinner + timeout.
+        setProgress(92, 'Finalizing', 'Reading merged video from FFmpeg memory…');
+        appendProgressDetail('  reading output.mp4 from WASM filesystem…');
+        let output;
+        try {
+          output = await Promise.race([
+            ffmpeg.readFile('output.mp4'),
+            new Promise((_, reject) => setTimeout(
+              () => reject(new Error('readFile timed out after 60s')),
+              60000
+            )),
+          ]);
+        } catch (readErr) {
+          appendProgressDetail('  [warn] readFile failed: ' + (readErr.message || readErr));
+          // Force-reset the FFmpeg instance so the next merge starts fresh
+          try { ffmpeg.terminate(); } catch (e) {}
+          state.ffmpeg = null;
+          state.ffmpegLoaded = false;
+          throw new Error(
+            'The merge completed but the output file could not be read from FFmpeg\'s virtual filesystem. ' +
+            'This is a known FFmpeg.wasm 0.12.x issue where the worker enters a bad state after the "Aborted()" exit message. ' +
+            'Please click "Merge Videos" again — the second attempt usually succeeds because the engine is already cached.'
+          );
+        }
+        appendProgressDetail('  read ' + formatBytes(output.byteLength) + ' from output.mp4');
+        const blob = new Blob([output.buffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+
+        // 6. Cleanup FFmpeg FS (best-effort). After "Aborted()" the worker is
+        //    often in a bad state, so we force-terminate + reset for the next merge.
+        let cleanupFailed = false;
+        try {
+          await ffmpeg.deleteFile('output.mp4');
+          await ffmpeg.deleteFile('list.txt');
+          for (const f of inputFiles) {
+            try { await ffmpeg.deleteFile(f.fname); } catch (e) {}
+          }
+        } catch (e) {
+          console.warn('cleanup failed (expected after Aborted):', e);
+          cleanupFailed = true;
+        }
+        // Always force-reset after a merge — guarantees the next merge starts fresh
+        // and avoids the post-abort hang on subsequent readFile calls.
+        try { ffmpeg.terminate(); } catch (e) {}
+        state.ffmpeg = null;
+        state.ffmpegLoaded = false;
+
+        // 7. Show result
+        setProgress(100, 'Complete', 'Merge finished in ' + elapsed + 's');
+        progressSection.style.display = 'none';
+        showResult(url, blob.size, readyVideos);
+
+      } catch (e) {
+        const msg = String(e.message || e);
+        if (msg.includes('cancelled')) {
+          progressSection.style.display = 'none';
+          appendProgressDetail('--- Cancelled by user ---');
+        } else {
+          console.error('merge failed', e);
+          showError('Merge failed: ' + msg + '. See progress log above for details.');
+          progressSection.style.display = 'none';
+        }
+      } finally {
+        state.isProcessing = false;
+        updateActions();
+      }
+    });
+
+    function setProgress(pct, stage, detail) {
+      progressFill.style.width = pct + '%';
+      progressPercent.textContent = pct.toFixed(0) + '%';
+      progressStage.textContent = stage;
+      // Show animated stripes + hint when in the Finalizing stage
+      // (FFmpeg finished, reading output from WASM memory — can be slow)
+      if (stage === 'Finalizing') {
+        progressFill.classList.add('finalizing');
+        finalizingHint.classList.add('active');
+      } else {
+        progressFill.classList.remove('finalizing');
+        finalizingHint.classList.remove('active');
+      }
+      if (detail) {
+        appendProgressDetail('[' + stage + '] ' + detail);
+      }
+    }
+    function appendProgressDetail(line) {
+      progressDetail.textContent += line + '\n';
+      progressDetail.scrollTop = progressDetail.scrollHeight;
+    }
+
+    function showResult(url, sizeBytes, sources) {
+      resultSection.style.display = 'block';
+      resultPreview.src = url;
+      const totalDuration = sources.reduce((a, v) => a + (v.duration || 0), 0);
+      $('resultDuration').textContent = formatDuration(totalDuration);
+      // Read actual resolution from the result preview once metadata loads
+      resultPreview.onloadedmetadata = () => {
+        $('resultResolution').textContent = resultPreview.videoWidth + '×' + resultPreview.videoHeight;
+        if (resultPreview.duration && !isNaN(resultPreview.duration)) {
+          $('resultDuration').textContent = formatDuration(resultPreview.duration);
+        }
+      };
+      $('resultSize').textContent = formatBytes(sizeBytes);
+
+      // Detect iOS/iPadOS to show the long-press hint
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        iosHint.style.display = 'block';
+      } else {
+        iosHint.style.display = 'none';
+      }
+
+      // Store the blob URL + size for the download handler
+      // We need the actual Blob to use the Web Share API with files
+      // The url is already a blob: URL, so we fetch it to get the Blob
+      // (We could have kept the blob from earlier, but re-fetching is simpler)
+      state.resultUrl = url;
+
+      // Check if Web Share API with file sharing is supported (iOS 15+)
+      if (navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'test.mp4', { type: 'video/mp4' })] })) {
+        shareBtn.style.display = 'inline-block';
+      } else {
+        shareBtn.style.display = 'none';
+      }
+
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ---- Download handler (iOS-aware) ----
+    // On iOS Safari, <a download> doesn't work — we use a multi-strategy approach:
+    //   1. Try navigator.share({ files: [...] }) — opens the native share sheet (iOS 15+)
+    //   2. If share fails or is unavailable, open the blob URL in a new tab where
+    //      the user can long-press the video and choose "Save Video"
+    //   3. As a last resort, create an <a download> and click it (works on desktop)
+    async function handleDownload() {
+      if (!state.resultUrl) return;
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = 'Preparing…';
+
+      try {
+        // Fetch the blob from the URL (it's a blob: URL so this is instant)
+        const resp = await fetch(state.resultUrl);
+        const blob = await resp.blob();
+        const file = new File([blob], 'merged-video.mp4', { type: 'video/mp4' });
+
+        // Strategy 1: Web Share API with files (iOS 15+, Android Chrome, Safari desktop 15+)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Merged Video',
+              text: 'Video merged with Video Merger',
+            });
+            // User shared or dismissed — either way, we're done
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = '↓ Save Video';
+            return;
+          } catch (shareErr) {
+            // User cancelled share, or share failed — fall through to strategy 2
+            console.log('Share failed or cancelled, falling back to new tab:', shareErr);
+            if (shareErr && shareErr.name === 'AbortError') {
+              // User explicitly cancelled — don't bother with fallback
+              downloadBtn.disabled = false;
+              downloadBtn.textContent = '↓ Save Video';
+              return;
+            }
+          }
+        }
+
+        // Strategy 2: Open in a new tab (iOS Safari will show the video;
+        // user long-presses to save)
+        const newTab = window.open(state.resultUrl, '_blank');
+        if (newTab) {
+          // New tab opened — iOS Safari shows the video; user long-presses to save
+          if (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+            alert('Video opened in a new tab.\n\nTo save it:\n1. Long-press the video\n2. Choose "Save Video" or "Save to Files"');
+          }
+        } else {
+          // Pop-up blocked — try the old <a download> approach as a last resort
+          const a = document.createElement('a');
+          a.href = state.resultUrl;
+          a.download = 'merged-video.mp4';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      } catch (e) {
+        console.error('download failed', e);
+        // Final fallback: just open the URL directly
+        window.open(state.resultUrl, '_blank');
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = '↓ Save Video';
+      }
+    }
+
+    downloadBtn.addEventListener('click', handleDownload);
+
+    // ---- Share button (alternative to download) ----
+    shareBtn.addEventListener('click', async () => {
+      if (!state.resultUrl) return;
+      try {
+        const resp = await fetch(state.resultUrl);
+        const blob = await resp.blob();
+        const file = new File([blob], 'merged-video.mp4', { type: 'video/mp4' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Merged Video',
+            text: 'Video merged with Video Merger',
+          });
+        }
+      } catch (e) {
+        console.error('share failed', e);
+        if (e && e.name !== 'AbortError') {
+          alert('Share failed: ' + (e.message || e));
+        }
+      }
+    });
+
+    // ---- Cancel ----
+    cancelBtn.addEventListener('click', () => {
+      if (!state.isProcessing) return;
+      if (!confirm('Cancel the merge? Partial progress will be lost.')) return;
+      state.cancelRequested = true;
+      // FFmpeg.wasm doesn't expose a clean terminate() in 0.12 UMD; we set the flag
+      // and the next progress callback will let it finish naturally.
+      // For a hard kill, the user can refresh the page.
+      appendProgressDetail('--- Cancel requested, terminating after current step ---');
+    });
+
+    // ---- Reset ----
+    resetBtn.addEventListener('click', () => {
+      if (resultPreview.src) URL.revokeObjectURL(resultPreview.src);
+      resultSection.style.display = 'none';
+      progressSection.style.display = 'none';
+      progressDetail.textContent = '';
+      progressFill.style.width = '0%';
+      progressFill.classList.remove('finalizing');
+      finalizingHint.classList.remove('active');
+      iosHint.style.display = 'none';
+      shareBtn.style.display = 'none';
+      state.videos = [];
+      state.isProcessing = false;
+      state.cancelRequested = false;
+      state.resultUrl = null;
+      renderList();
+      updateActions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // ---- Keyboard shortcut: Esc to cancel ----
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.isProcessing) {
+        cancelBtn.click();
+      }
+    });
+
+    // ---- Initial render ----
+    renderList();
+    updateActions();
+
+    // ---- Detect file:// protocol and show a banner ----
+    if (window.location.protocol === 'file:') {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'padding:16px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);border-radius:8px;margin-bottom:20px;color:#fbbf24;font-size:0.92rem;line-height:1.5';
+      banner.innerHTML =
+        '<strong>⚠ This file was opened directly from disk (file:// protocol).</strong><br>' +
+        'Browsers block cross-origin requests from file:// — FFmpeg.wasm will fail to load.<br><br>' +
+        '<strong>To fix:</strong> Serve the file over HTTP. Easiest way:<br>' +
+        '<code style="display:block;background:rgba(0,0,0,0.4);padding:8px;border-radius:4px;margin:8px 0">python -m http.server 8000</code><br>' +
+        'Then open <code>http://localhost:8000/video-merger.html</code> in your browser.<br><br>' +
+        '<em>Or use an online demo: <a href="https://ffmpegwasm.netlify.app/" target="_blank" style="color:#60a5fa;text-decoration:underline">ffmpegwasm.netlify.app</a></em>';
+      document.querySelector('.container').insertBefore(banner, document.querySelector('header').nextSibling);
+    }
+
+    console.log('Video Merger ready. Select videos to begin.');
+  </script>
+</body>
+</html>
